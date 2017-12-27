@@ -1,5 +1,6 @@
 package com.fisbein.joan.model;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -421,14 +422,26 @@ public class ImapCopier implements Runnable {
 
 		public MessageFilterPredicate(Message[] filterMessages) throws MessagingException {
 			for (Message message : filterMessages) {
-				messagesId.add(message.getHeader("Message-ID")[0]);
+				String[] msgHeader = message.getHeader("Message-ID");
+				if (msgHeader != null) {
+					messagesId.add(msgHeader[0]);
+				}
+				else {
+					try {
+						log.warn("Message has no Message-ID header! " + message.getContent().toString());
+					} catch (IOException ioe) {
+						log.error("Error while logging", ioe);
+					}
+				}
 			}
 		}
 
 		public boolean evaluate(Message message) {
 			boolean res = true;
 			try {
-				res = messagesId.isEmpty() || !messagesId.contains(message.getHeader("Message-ID")[0]);
+				
+				String[] msgHeader = message.getHeader("Message-ID");
+				res = messagesId.isEmpty() || (msgHeader != null && !messagesId.contains(msgHeader[0]));
 			} catch (MessagingException e) {}
 
 			return res;
