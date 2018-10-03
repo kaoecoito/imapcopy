@@ -1,24 +1,13 @@
 package com.fisbein.joan.model;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
-
-import javax.mail.Folder;
-import javax.mail.Message;
-import javax.mail.MessagingException;
-import javax.mail.Session;
-import javax.mail.Store;
-import javax.mail.URLName;
-
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.collections4.Predicate;
 import org.apache.log4j.Logger;
+
+import javax.mail.*;
+import java.io.IOException;
+import java.util.*;
+import java.util.regex.Pattern;
 
 public class ImapCopier implements Runnable {
 	private final static Logger log = Logger.getLogger(ImapCopier.class);
@@ -29,27 +18,37 @@ public class ImapCopier implements Runnable {
 	
 	private Store targetStoreForCheck = null;
 
-	private HashSet<String> alreadyCopied = new HashSet<String>();
+	private final HashSet<String> alreadyCopied = new HashSet<>();
 
-	private List<ImapCopyListenerInterface> listeners = new ArrayList<ImapCopyListenerInterface>(0);
+	private final List<ImapCopyListenerInterface> listeners = new ArrayList<>(0);
 
-	private List<String> filteredFolders = new ArrayList<String>();
+	private final List<String> filteredFolders = new ArrayList<>();
+	private final List<String> onlyFolders = new ArrayList<>();
 	
 	private int endYear;
 
 	public static void main(String[] args) throws MessagingException {
 		log.info("Starting");
 		log.debug("Parameters length:" + args.length);
-		if (args.length >= 3) {
+		if (args.length >= 2) {
 			ImapCopier imapCopier = new ImapCopier();
-			imapCopier.setEndYear(args[2]);
+			imapCopier.setEndYear(Calendar.getInstance().get(Calendar.YEAR));
 			try {
 				log.debug("opening conections");
 				imapCopier.openSourceConnection(args[0].trim());
 				imapCopier.openTargetConnection(args[1].trim());
-				if (args.length > 3) {
-					for (int i = 3; i < args.length; i++) {
-						imapCopier.addFilteredFolder(args[i]);
+				if (args.length > 2) {
+					for (int i = 2; i < args.length; i++) {
+						if ("-y".equals(args[i])) {
+							imapCopier.setEndYear(args[i+1]);
+							i++;
+						} else if ("-e".equals(args[i])) {
+							imapCopier.addFilteredFolder(args[i+1]);
+							i++;
+						} else if ("-i".equals(args[i])) {
+							imapCopier.addOnlyFolder(args[i+1]);
+							i++;
+						}
 					}
 				}
 				imapCopier.copy();
@@ -57,7 +56,7 @@ public class ImapCopier implements Runnable {
 				imapCopier.close();
 			}
 		} else {
-			String usage = "usage: imapCopy source target untilyear [excludedFolder]\n";
+			String usage = "usage: imapCopy source target [-y untilyear] [-e excludedFolder] [-i onlyFolder]\n";
 			usage += "source & target format: protocol://user[:password]@server[:port]\n";
 			usage += "protocols: imap or imaps";
 			System.out.println(usage);
@@ -68,9 +67,18 @@ public class ImapCopier implements Runnable {
 		log.debug("Adding '" + folderName + "' to filtered folders");
 		filteredFolders.add(folderName);
 	}
-	
+
+	public void addOnlyFolder(String folderName) {
+		log.debug("Adding '" + folderName + "' to only folders");
+		onlyFolders.add(folderName);
+	}
+
 	private void setEndYear(String year) {
 		endYear = Integer.parseInt(year);
+	}
+
+	private void setEndYear(int year) {
+		endYear = year;
 	}
 
 	/**
@@ -243,6 +251,13 @@ public class ImapCopier implements Runnable {
 		return targetFolder.getFullName() + time + msgId;
 	}
 
+	private boolean matchFolder(List<String> patterns, String name) {
+		for (String pattern:patterns) {
+			return Pattern.compile(pattern).matcher(name).matches();
+		}
+		return false;
+	}
+
 	/**
 	 * Copy recusively the soruce folder and his contents to the target folder
 	 * 
@@ -254,7 +269,9 @@ public class ImapCopier implements Runnable {
 	private void copyFolderAndMessages(Folder sourceFolder, Folder targetFolder, boolean isDefaultFolder)
 			throws MessagingException {
 
-		if (sourceFolder.exists() && !filteredFolders.contains(sourceFolder.getFullName())) {
+		if (sourceFolder.exists() &&
+				!matchFolder(filteredFolders, sourceFolder.getFullName()) &&
+				(sourceFolder.getFullName().isEmpty() || onlyFolders.isEmpty() || matchFolder(onlyFolders,sourceFolder.getFullName()))) {
 			if (!isDefaultFolder) {
 				openfolderIfNeeded(sourceFolder, Folder.READ_ONLY);
 				openfolderIfNeeded(targetFolder, Folder.READ_ONLY);
@@ -288,7 +305,7 @@ public class ImapCopier implements Runnable {
 				copyFolderAndMessages(sourceSubFolder, targetSubFolder, false);
 			}
 		} else {
-			log.info("Skipping folder " + sourceFolder.getFullName());
+			log.info(String.format("Skipping folder [%s]", sourceFolder.getFullName()));
 		}
 	}
 
@@ -307,14 +324,21 @@ public class ImapCopier implements Runnable {
 	 * @throws MessagingException
 	 */
 	private Message[] filterMessages(Folder folder, Message[] input) throws MessagingException {
-		List<Message> result = new ArrayList<Message>();
+		final List<Message> result = new ArrayList<>();
 		for (Message message : input) {
 			
-			Date sentDate = message.getSentDate();
-			if (sentDate == null || (sentDate.getYear() +1900) > endYear) continue;
+			final Calendar sentDate =  toCalendar(message.getSentDate());
+			if (sentDate == null || sentDate.get(Calendar.YEAR) > endYear) continue;
 			result.add(message);
 		}
 		return result.toArray(new Message[0]);
+	}
+
+	private Calendar toCalendar(Date date) {
+		if (date==null) return null;
+		Calendar calendar = Calendar.getInstance();
+		calendar.setTime(date);
+		return calendar;
 	}
 
 	/**
