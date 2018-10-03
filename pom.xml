@@ -3,83 +3,13 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>jfisbein</groupId>
 	<artifactId>imapcopy</artifactId>
-	<version>1.1.0</version>
+	<version>1.2.0</version>
 
-	<prerequisites>
-		<maven>3.0</maven>
-	</prerequisites>
+	<properties>
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
+	</properties>
 
-	<build>
-		<sourceDirectory>src/java</sourceDirectory>
-		<resources>
-			<resource>
-				<directory>src/etc</directory>
-			</resource>
-		</resources>
-		<plugins>
-			<plugin>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.3</version>
-				<configuration>
-					<source />
-					<target />
-				</configuration>
-			</plugin>
-
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-shade-plugin</artifactId>
-				<version>2.4</version>
-				<executions>
-					<execution>
-						<phase>package</phase>
-						<goals>
-							<goal>shade</goal>
-						</goals>
-						<configuration>
-							<transformers>
-								<transformer
-									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-									<mainClass>com.fisbein.joan.gui.ImapCopyGui</mainClass>
-								</transformer>
-							</transformers>
-							<createDependencyReducedPom>false</createDependencyReducedPom>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
-				<artifactId>maven-resources-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>copy-appCtx</id>
-						<phase>generate-resources</phase>
-						<goals>
-							<goal>copy-resources</goal>
-						</goals>
-						<configuration>
-							<outputDirectory>${project.build.directory}</outputDirectory>
-							<overwrite>true</overwrite>
-							<resources>
-								<resource>
-									<directory>src/etc</directory>
-									<includes>
-										<include>*</include>
-									</includes>
-								</resource>
-							</resources>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-		</plugins>
-	</build>
-	<inceptionYear>2015</inceptionYear>
-	<url>https://github.com/jfisbein/imapcopy</url>
-	<scm>
-		<url>https://github.com/jfisbein/imapcopy</url>
-		<developerConnection>git@github.com:jfisbein/imapcopy.git</developerConnection>
-	</scm>
 	<dependencies>
 		<dependency>
 			<groupId>javax.mail</groupId>
@@ -107,8 +37,20 @@
 			<artifactId>commons-collections4</artifactId>
 			<version>4.0</version>
 		</dependency>
-
-
 	</dependencies>
+
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>${maven.compiler.source}</source>
+					<target>${maven.compiler.target}</target>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
 
 </project>
